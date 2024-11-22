@@ -24,21 +24,21 @@ include = [
 maintenance = { status = "passively-maintained" }
 
 [dependencies]
-ddc = "0.2"
+ddc = "0.3"
 edid = "0.3"
-mccs = "0.1"
-mccs-caps = "0.1"
-mccs-db = "0.1"
-thiserror = "1"
+mccs = "0.2"
+mccs-caps = "0.2"
+mccs-db = "0.2"
+thiserror = "2.0"
 log = "0.4"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-ddc-i2c = { version = "0.2", default-features = false, features = ["with-linux", "with-linux-enumerate"], optional = false }
+ddc-i2c = { version = "~0.2.3", default-features = false, features = ["with-linux", "with-linux-enumerate"], optional = false }
 
 [target.'cfg(windows)'.dependencies]
 ddc-winapi = { version = "0.2", optional = true }
 nvapi = { version = "0.1", default-features = false, features = ["i2c"], optional = true }
-ddc-i2c = { version = "0.2", optional = true }
+ddc-i2c = { version = "~0.2.3", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 ddc-macos = { version = "0.2", optional = true }
