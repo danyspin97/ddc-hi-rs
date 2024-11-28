@@ -416,38 +416,48 @@ impl Display {
         }
     }
 
+    #[cfg(feature = "has-ddc-i2c")]
+    /// Create a new display from an I2C device
+    pub fn from_path<P>(path: P) -> Result<Self, String>
+    where
+        P: AsRef<std::path::Path>,
+    {
+        Self::from_i2c_dev(ddc_i2c::from_i2c_device(path).map_err(|e| e.to_string())?)
+    }
+
+    #[cfg(feature = "has-ddc-i2c")]
+    /// Create a new display from an I2C device
+    fn from_i2c_dev(mut ddc: ddc_i2c::I2cDeviceDdc) -> Result<Self, String> {
+        use std::os::unix::fs::MetadataExt;
+
+        let id = ddc
+            .inner_ref()
+            .inner_ref()
+            .metadata()
+            .map(|meta| meta.rdev())
+            .unwrap_or(Default::default());
+        let mut edid = vec![0u8; 0x100];
+        ddc.read_edid(0, &mut edid)
+            .map_err(|e| format!("failed to read EDID for i2c-{}: {}", id, e))?;
+        let info = DisplayInfo::from_edid(Backend::I2cDevice, id.to_string(), edid)
+            .map_err(|e| format!("failed to parse EDID for i2c-{}: {}", id, e))?;
+        Ok(Display::new(Handle::I2cDevice(ddc), info))
+    }
+
     /// Enumerate all detected displays.
     pub fn enumerate() -> Vec<Self> {
         let mut displays = Vec::new();
 
         #[cfg(feature = "has-ddc-i2c")]
         {
-            use std::os::unix::fs::MetadataExt;
-
             if let Ok(devs) = ddc_i2c::I2cDeviceEnumerator::new() {
-                displays.extend(
-                    devs.map(|mut ddc| -> Result<_, String> {
-                        let id = ddc
-                            .inner_ref()
-                            .inner_ref()
-                            .metadata()
-                            .map(|meta| meta.rdev())
-                            .unwrap_or(Default::default());
-                        let mut edid = vec![0u8; 0x100];
-                        ddc.read_edid(0, &mut edid)
-                            .map_err(|e| format!("failed to read EDID for i2c-{}: {}", id, e))?;
-                        let info = DisplayInfo::from_edid(Backend::I2cDevice, id.to_string(), edid)
-                            .map_err(|e| format!("failed to parse EDID for i2c-{}: {}", id, e))?;
-                        Ok(Display::new(Handle::I2cDevice(ddc), info))
-                    })
-                    .filter_map(|d| match d {
-                        Ok(v) => Some(v),
-                        Err(e) => {
-                            warn!("Failed to enumerate a display: {}", e);
-                            None
-                        },
-                    }),
-                )
+                displays.extend(devs.map(Self::from_i2c_dev).filter_map(|d| match d {
+                    Ok(v) => Some(v),
+                    Err(e) => {
+                        warn!("Failed to enumerate a display: {}", e);
+                        None
+                    },
+                }))
             }
         }
 
